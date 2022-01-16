@@ -1,0 +1,56 @@
+---
+title: "In-class Exercise 1: Building Elegant Graphics with ggplot2"
+description: |
+  This is my first date with ggplot2
+author:
+  - name: Bi Lian
+    url: https://bilian.netlify.app/
+    affiliation: SMU
+    affiliation_url: https://www.smu.edu.sg/
+date: "`r Sys.Date()`"
+output: distill::distill_article
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.retina = 3)
+
+```
+
+# Installing and loading the required libraries
+
+```{r}
+packages = c('tidyverse', 'ggrepel')
+for(p in packages){
+  if(!require(p,character.only = T)){
+    install.packages(p)
+  }
+  library(p,character.only = T)
+}
+```
+# Import data into R
+
+```{r}
+exam_data <- read_csv("data/Exam_data.csv")
+```
+# My first data visualisation created using ggplot2
+```{r}
+ggplot(data=exam_data,aes(x = MATHS)) +
+  geom_histogram(bins = 20,
+                 colour="black",
+                 fill="light blue") 
+```
+##
+
+```{r}
+ggplot(data=exam_data,
+       aes(x = MATHS,
+           fill = GENDER))+
+  geom_histogram(bins = 20,
+                 color="grey30")
+```
+
+
