@@ -1,0 +1,88 @@
+---
+title: "In-class Exercise 2"
+description: |
+  Using Tidyverse, readxl and dplyr
+author:
+  - name: Bi Lian
+    url: https://bilian.netlify.app/
+    affiliation: SMU
+    affiliation_url: https://www.smu.edu.sg/
+date: "`r Sys.Date()`"
+output: distill::distill_article
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.retina = 3)
+```
+#   Getting Started
+
+## Installing and loading the required libraries
+
+```{r}
+packages = c('tidyverse','readxl', 'knitr')
+for(p in packages){
+  if(!require(p,character.only = T)){
+    install.packages(p)
+  }
+  library(p,character.only = T)
+}
+```
+## Importing the data
+
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+orders <- read_xls("data/Superstore-2021.xls", sheet = "Orders")
+returns <- read_xls("data/Superstore-2021.xls", sheet =  "Returns")
+```
+
+## Preparing the data
+
+### Joining tables
+
+```{r}
+joined_tab <- left_join(returns, orders, 
+                        by=c('Order ID' = 'Order ID'))
+
+```
+
+### Compute the frequency count by Sub-Category
+
+#### *Group_by* method
+```{r}
+freq_returned <- joined_tab %>%
+  group_by(`Sub-Category`) %>%
+  summarise('Returns' = n ()) %>% 
+  ungroup()
+```
+
+#### *Count* method
+```{r}
+freq_returned2 <- joined_tab %>%  
+  count(`Sub-Category`) %>% 
+  rename(Returns = n)
+```
+
+### Sorting Data
+
+```{r}
+freq_sorted <- freq_returned %>%
+  arrange(desc(Returns))
+```
+```{r, layout="l-body-outset"}
+library(rmarkdown)
+paged_table(freq_sorted)
+```
+
+### Computing cumulative frequency
+```{r}
+freq_cum <- freq_sorted %>%
+  mutate(cumfreq = cumsum(Returns))
+```
+
+```{r, layout="l-body-outset"}
+library(rmarkdown)
+paged_table(freq_cum)
+```
