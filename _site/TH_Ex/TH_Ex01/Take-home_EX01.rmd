@@ -180,7 +180,8 @@ ggplot(data=freq_cum, aes(x = reorder(`Sub-Category`, -Returns), y = Returns)) +
   geom_point(aes(y = `cumfreq`/coeff), colour = 'orange', size = 2) +
   geom_line(aes(y = `cumfreq`/coeff), colour = 'orange', group = 1) +
   geom_hline(yintercept = 80/coeff, colour = 'dark grey', linetype = 'dashed') +
-  scale_y_continuous(name =  "Count of Returns", breaks = seq(0, 1000, 100), sec.axis = sec_axis(~.*coeff, name = "Percentage of cumulative sum of Returns (%)")) +
+  scale_y_continuous(name =  "Count of Returns", breaks = seq(0, 1000, 100), 
+  sec.axis = sec_axis(~.*coeff, name = "Percentage of cumulative sum of Returns (%)")) +
   xlab("Sub-Category") +
   theme_bw()+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
@@ -283,4 +284,4 @@ Similar visualisations were created using Tableau in class. Comparing with Table
 * R has many packages and has endless possibilities on how you want to create your visualisation. In fact, there is a package [ggQC](https://rdrr.io/cran/ggQC/man/stat_pareto.html) available to create pareto chart with simpler step though I did not try in this exercise.  With Distil, it allows you to create a webpage seamlessly in a single platform (R studio) and publish in different formats. This is not possible with Tableau. 
 
 
-[Back to homepage](https://bilian.netlify.app/)
+[Back to homepage](https://bilian-mitb2021.netlify.app/)
