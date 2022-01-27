@@ -1,0 +1,286 @@
+---
+title: "Take-home Exercise 1"
+description: 
+  Creating data visualisation beyond default
+author:
+  - name: Ang Bi Lian
+    url: https://bilian.netlify.app/
+date: "`r Sys.Date()`"
+output: 
+  distill::distill_article:
+    toc: true        
+ 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.retina = 3)
+```
+# The Task
+
+This [take-home exercise](https://isss608-ay2021-22t2.netlify.app/th_ex/th_ex01) aims to sharpen the skill of building data visualisation programmatically using R ggplot2. The specific requirements are: 
+
+1. Create a pareto chart showing showing the distribution of returns by product sub-category, using the superstore-2021.xls file.
+
+2. Create a age-sex pyramid showing the demographic structure of Singapore by age cohort and gender for June 2021. The data set is obtained from [Department of Statistics](https://www.singstat.gov.sg/).
+
+You can find the links to download the dataset below:
+
+```{r, echo = FALSE}
+xfun::embed_file('data/Superstore-2021.xls')
+```
+```{r, echo = FALSE}
+xfun::embed_file('data/respopagesextod2021.csv')
+```
+
+# 1.0 Distribution of Returns by Sub-category
+
+##  1.1 Sketch of Proposed Design
+
+```{r, echo = FALSE, layout = "1-body-outset"}
+knitr::include_graphics("image/Pareto.Png")
+```
+
+##  1.2 Installing and loading the required libraries
+
+The packages required are **tidyverse** (included relevant packages for data analyses such as **ggplot2**, **readr** and **dplyr**), **readxl**, **ggrepel** and **knitr**. 
+
+The code chunk below is used to install and load the required packages onto RStudio. 
+
+```{r}
+packages = c('tidyverse','readxl', 'knitr', 'ggrepel')
+for(p in packages){
+  if(!require(p,character.only = T)){
+    install.packages(p)
+  }
+  library(p,character.only = T)
+}
+```
+
+## 1.3 Importing the dataset
+
+The source file is in xls format, and consists of three worksheets, namely: Orders, People and Returns. Hence, read_csv() of the readr package is used to import the data. 
+
+```{r}
+orders <- read_xls("data/Superstore-2021.xls", sheet = "Orders")
+returns <- read_xls("data/Superstore-2021.xls", sheet =  "Returns")
+glimpse(orders)
+glimpse(returns)
+```
+
+## 1.4 Data Wrangling
+
+### Joining two tables
+
+As we are interested in plotting the count of returns by sub-category, and the information is found in two separate sheets, Orders and Returns, we need to join the data tables. Using Order ID as the unique identifier,  left_join() of **dplyr** is used to join the Returns data frame and Orders data frame.
+
+```{r}
+joined_tab <- left_join(returns, orders, 
+                        by=c('Order ID' = 'Order ID'))
+```
+
+### Compute frequency count of returns by sub-category
+
+Then, the frequency count of returns by sub-category is computed by using the *group_by* method found in **dplyr**. 
+
+#### *Group_by* method
+```{r}
+freq_returned <- joined_tab %>%
+  group_by(`Sub-Category`) %>%
+  summarise('Returns' = n ()) %>% 
+  ungroup()
+```
+
+The alternative method is to use the *count* method in **dplyr**. By default, count() will return a new field called n to store the result. Hence, rename() of **dplyr** is used to rename n to *Returns*.
+
+#### *Count* method
+```{r}
+freq_returned2 <- joined_tab %>%  
+  count(`Sub-Category`) %>% 
+  rename(Returns = n)
+```
+
+The new dataframe, freq_returned, is shown in the following using paged_table of the **rmarkdown** package. 
+
+```{r}
+library(rmarkdown)
+paged_table(freq_returned)
+```
+
+### Sorting Data
+
+As shown above, the values of the tibble data frame is sorted according to the values of the first column, alphabetically by *Sub-category*. To obtain the cumulative frequency, the values in the the Returns field is first sorted in decreasing order using  arrange() of **dplyr** package.
+
+```{r}
+freq_sorted <- freq_returned %>%
+  arrange(desc(Returns))
+
+paged_table(freq_sorted)
+```
+
+### Computing cumulative frequency
+
+Next, mutate of **dylyr** and cumsum of **Base R** are used to compute the cumulative frequency of Returns. Using sum of **Base R**, the cumulative frequency is  divided by the sum of Returns to obtain the cumulative percentage of Returns. As the computed figures are in decimal, a factor of 100 is then applied to convert the values to percentage.
+
+```{r}
+freq_cum <- freq_sorted %>%
+  mutate(cumfreq = cumsum(Returns)/sum(Returns)*100)
+
+paged_table(freq_cum)
+```
+
+## 1.5 Creating the Pareto Chart
+
+### Plotting Returns in a bar chart
+
+There are two types of bar charts: geom_bar() and geom_col() in **ggplot**. geom_bar() makes the height of the bar proportional to the number of cases in each group, while the height of the bar in geom_col represent values in the data. In our case, since we already computed the frequency count and we want the bar height to represent the value in the dataset, geom_col() is used. 
+
+```{r}
+ggplot(data=freq_cum, 
+        aes(x = `Sub-Category`, y = Returns)) +
+       geom_col(fill = "light blue") 
+
+```
+
+As the bars are plotted in alphabetical order by default, the reorder function in **Base R** is used to sort the bars based on the count of the returns in decreasing order. 
+
+```{r}
+g1 <- ggplot(data=freq_cum, 
+        aes(x = reorder(`Sub-Category`, -Returns), y = Returns)) +
+        geom_col(fill = "light blue") +
+        xlab("Sub-Category")
+g1
+```
+### Plotting cumulative frequency line
+
+Next, geom_point from **ggplot2** package is added to use points to represent the cumulative frequency, and geom_line is added to connect the points.
+
+```{r}
+g2 <- g1 + 
+      geom_point(aes(y = `cumfreq`), colour = 'orange', size = 2) +
+      geom_line(aes(y = `cumfreq`), colour = 'orange', group = 1) 
+g2
+```
+
+### Formatting the Chart to improve visualisation
+
+Lastly, a secondary y-axis is added using sec_axis, which basically adds a new y-axis by transforming the primary y-axis using a coefficient. After some trial and error, a coefficient of 0.18 is selected i.e. primary y-axis is multiplied by 0.18 to get the secondary y axis. The corresponding values of the cumulative frequency also needs to be transformed using the coefficient. 
+
+Using geom_hline, a reference line representing 80% is added to make it clearer which are the sub-categories that contribute 80% of the returns. 
+
+By adjusting the settings using theme, the labels n the x-axis are also rotated so that they do not overlap each order. The complete code chunk to create the pareto chart and final formatted chart are shown below.
+
+```{r}
+coeff <- 0.18
+ggplot(data=freq_cum, aes(x = reorder(`Sub-Category`, -Returns), y = Returns)) +
+  geom_col(fill = "light blue") +
+  geom_point(aes(y = `cumfreq`/coeff), colour = 'orange', size = 2) +
+  geom_line(aes(y = `cumfreq`/coeff), colour = 'orange', group = 1) +
+  geom_hline(yintercept = 80/coeff, colour = 'dark grey', linetype = 'dashed') +
+  scale_y_continuous(name =  "Count of Returns", breaks = seq(0, 1000, 100), sec.axis = sec_axis(~.*coeff, name = "Percentage of cumulative sum of Returns (%)")) +
+  xlab("Sub-Category") +
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  annotate("text", x = 'Envelopes', y = 85/coeff, label = "80%", colour = "dark grey")
+```   
+
+# 2.0 Distribution of Population by Age and Sex
+
+## 2.1 Sketch of Proposed Design
+
+```{r, echo = FALSE, layout = "1-body-outset"}
+knitr::include_graphics("image/PopPy.Png")
+```
+##  2.2 Installing and loading the required libraries
+
+The packages required are **tidyverse** (included relevant packages for data analyses such as **ggplot2**, **readr** and **dplyr**), **ggrepel** and **knitr**. As the required packages to plot the population pyramid are already loaded in 1.2, we do not have to run new codes.
+
+## 2.2 Importing the dataset
+
+The source file is in csv format, hence read_csv of  **readr** package is used to import the dataset.
+
+```{r}
+Popdata <- read_csv("data/respopagesextod2021.csv")
+glimpse(Popdata)
+```
+
+## 2.3 Data Wrangling
+
+### Transforming the data of one gender
+
+For the population pyramid, we want the Pop values of one gender to appear on the left side of the chart, and the other to go on the right. Here, male is chosen, and the Pop values need to be transformed to negative values. The mutate function of **dplyr** package is used to add a new variable that consist of the negative male Pop values.
+
+```{r}
+Popdata_males <- Popdata %>%
+  filter(`Sex` ==  "Males") %>%
+  mutate (Pop = -Pop)
+glimpse(Popdata_males)
+```
+### Binding to form new dataset
+
+Next, we bind the new dataset containing negative Pop values of Males with the females data of the original dataset using rbind function in **Base R**.
+
+```{r}
+Popdata_females <-Popdata %>%
+  filter(`Sex` ==  "Females") 
+Popdata_T <- rbind(Popdata_males,Popdata_females)
+paged_table(Popdata_T)
+```
+
+## Creating the Population Pyramid
+
+### Initial plot
+
+geom_bar of **ggplot2** is used to plot the bar chart, and coord_flip is used to flip the x and y axis to form the pyramid. 
+
+```{r}
+ggplot(Popdata_T, aes (x = AG, y = Pop, fill = Sex)) +
+  geom_bar(stat = "identity") +
+  coord_flip()
+        
+```
+### Formatting the axis
+
+In the initial chart, it is observed that the age group 5 to 9 appeared in the middle of the axis. AG is initially a character field. factor  in **Base R** is then used to encode the variable AG to factor and to recognise that each value in AG is a unique level. 
+
+```{r}
+Popdata_T$AG <- factor (Popdata_T$AG, levels = unique(Popdata_T$AG)) 
+# To convert AG to a factor with unique values
+glimpse(Popdata_T$AG)
+```
+The default scale of the x axis is also not easy to read.To reformat the x axis, seq in **Base R** is used to sequence the axis with each interval having a length of 50000, and the labels of the x-axis to range from 0 to 200000 on both ends.
+
+```{r} 
+xbrks <- seq(-200000, 200000, 50000)
+xlabls <- paste0(as.character(c(seq(200, 0, -50), seq(50, 200, 50))), "k")
+# creating new intervals and labels for x-axis
+```
+
+### Final Visualisation
+
+The final chart after formatting is shown below.
+
+```{r}
+ggplot(Popdata_T, aes (x = AG, y = Pop, fill = Sex)) +
+  geom_bar(stat = "identity", width = .6 ) +
+  scale_y_continuous(breaks = xbrks, labels = xlabls, name = "Population Size") +
+  xlab("Age Groups") +
+  coord_flip() +
+  theme_bw()
+
+```
+# 3.0 Comparing R and Tableau on Data Visualisation
+
+Similar visualisations were created using Tableau in class. Comparing with Tableau, creating the charts programmatically using R have the following benefits:
+
+* With R, you know what each chart is composed of and what goes into every point on the chart. Hence, it is easier to know what and how to customise the charts. For instance, you can specify the width of the bar, change the sequence and labels of the interval. 
+
+* As the codes are reproducible, it is easier to replicate similar visualisation if you change the data using the same codes. For Tableau, although you can drag and drop, you will have to restart the entire process everytime you change the data. 
+
+* R has many packages and has endless possibilities on how you want to create your visualisation. With Distil, it allows you to create a webpage seamlessly in a single platform (R studio) and publish in different formats. This is not possible with Tableau. 
+
+
+[Back to homepage](https://bilian.netlify.app/)

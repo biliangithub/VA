@@ -1,6 +1,6 @@
 ---
 title: "In-class Exercise 2"
-description: |
+description: 
   Using Tidyverse, readxl and dplyr
 author:
   - name: Bi Lian
