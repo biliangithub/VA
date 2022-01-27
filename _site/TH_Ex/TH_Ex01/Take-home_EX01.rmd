@@ -230,7 +230,7 @@ Popdata_T <- rbind(Popdata_males,Popdata_females)
 paged_table(Popdata_T)
 ```
 
-## Creating the Population Pyramid
+## 2.4 Creating the Population Pyramid
 
 ### Initial plot
 
@@ -280,7 +280,7 @@ Similar visualisations were created using Tableau in class. Comparing with Table
 
 * As the codes are reproducible, it is easier to replicate similar visualisation if you change the data using the same codes. For Tableau, although you can drag and drop, you will have to restart the entire process everytime you change the data. 
 
-* R has many packages and has endless possibilities on how you want to create your visualisation. With Distil, it allows you to create a webpage seamlessly in a single platform (R studio) and publish in different formats. This is not possible with Tableau. 
+* R has many packages and has endless possibilities on how you want to create your visualisation. In fact, there is a package [ggQC](https://rdrr.io/cran/ggQC/man/stat_pareto.html) available to create pareto chart with simpler step though I did not try in this exercise.  With Distil, it allows you to create a webpage seamlessly in a single platform (R studio) and publish in different formats. This is not possible with Tableau. 
 
 
 [Back to homepage](https://bilian.netlify.app/)
