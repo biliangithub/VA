@@ -4,7 +4,7 @@ description:
   Creating data visualisation beyond default
 author:
   - name: Ang Bi Lian
-    url: https://bilian.netlify.app/
+  - url: https://bilian-mitb2021.netlify.app/
 date: "`r Sys.Date()`"
 output: 
   distill::distill_article:

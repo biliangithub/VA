@@ -8,9 +8,6 @@ site: distill::distill_website
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 
-# Learn more about creating websites with Distill at:
-# https://rstudio.github.io/distill/website.html
-
 ```
 
 This website is a collection of all the exercises and assignments that are required under **ISSS608 Visual Analytics and Applications**.
