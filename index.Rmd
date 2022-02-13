@@ -1,6 +1,6 @@
 ---
 title: "Bi Lian's Visual Analytics Site"
-description: |
+description: 
   Welcome!
 site: distill::distill_website
 ---
