@@ -1,0 +1,246 @@
+---
+title: "Take-home Exercise 3"
+description: 
+  A multivariate visualisation of nutritional content of Starbucks Drinks
+author:
+  - name: Ang Bi Lian
+  - url: https://bilian-mitb2021.netlify.app/
+date: "`r Sys.Date()`"
+output: 
+  distill::distill_article:
+    toc: true        
+ 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.retina = 3)
+```
+# 1.0 The Task
+
+For this [take-home exercise](https://isss608-ay2021-22t2.netlify.app/th_ex/th_ex03), I am required to apply appropriate data visualisation techniques to accomplish the following task:
+
+- Create a data visualisation to segment kid drinks and other by nutrition indicators. For the purpose of this task, starbucks_drink.csv should be used.
+
+# 2.0 Proposed Sketch
+
+Heatmap is chosen as the data set contains multiple nutrition indicators (multivariate), and it is possible that these indicators could be correlated to each other e.g. high sugar content usually leads to high calorie. A sketch of the proposed visualisation is shown below:
+
+![](image/sketch.png)
+
+# 3.0 Installing and loading the required libraries
+
+For this visualization, the following packages are used:
+
+- *dendextend*  : To determine the best clustering method and number of cluster
+- *heatmaply*   : To plot interactive heat map
+- *pheatmap*    : To provide more control to change the appearance of heatmaps
+- *tidyverse*   : To tidy up and manipulate the data as needed 
+- *rmarkdown*   : To convert the document into a variety of format (html for this task)
+  
+
+```{r}
+packages = c('tidyverse', 'dendextend', 'heatmaply', 'pheatmap', 'rmarkdown')
+  for (p in packages){
+    if(!require(p, character.only =T)){
+      install.packages(p)
+    }
+  }
+```
+
+# 4.0 Importing the data set and Preparing the data
+
+## 4.1 Importing the data set
+
+Since the source file is in csv format, read_csv() of *readr* package is used to import the data.
+
+```{r}
+starbucks <- read_csv("data/starbucks_drink.csv")
+```
+## 4.2 Data Wrangling
+
+### Extract relevant data
+As we are only interested in the category "kids-drinks-and-others", the data of this category is extracted using filter() of *dyplyr* package.
+
+```{r}
+#extract data of kids-drinks-and-others
+kids <- starbucks %>%
+          filter (`Category`== "kids-drinks-and-other")
+```
+
+### Transform data
+Also, noticed that there are several variables that are not in their correct data type  i.e. 'Caffeine' should be a numeric and not character; 'Size', 'Milk' and ' Whipped Cream' should be converted from character type to a factor so that the data will be properly ordered subsequently. The functions as.numeric() and as.factor() are used to convert the variables.
+
+```{r}
+kids$`Caffeine(mg)`<-as.numeric(kids$`Caffeine(mg)`)
+kids$`Size`<-as.factor(kids$`Size`)
+kids$`Milk`<-as.factor(kids$`Milk`)
+kids$`Whipped Cream`<-as.factor(kids$`Whipped Cream`)
+glimpse(kids)
+```
+
+There is a variable, "Portion(fl oz)" which represents the volume of drink, and is similar to another variable "Size". To avoid having too many categories which will affect the visualisation and for a fairer comparison, data transformation is required to convert the values of the various nutrition indicators to be based on per fl oz (fluid ounce) instead e.g. total fat per fl oz. The group_by() and summarise() functions of *dplyr* package is used to perform the data transformation.
+
+```{r}
+kids_grp <- kids %>%
+  dplyr::group_by(`Name`, `Whipped Cream`, `Milk`) %>%
+  summarise(`Calories`= sum(`Calories`)/sum(`Portion(fl oz)`),
+            `Calories from fat` = sum(`Calories from fat`)/sum(`Portion(fl oz)`), 
+            `Total Fat(g)` = sum(`Total Fat(g)`)/sum(`Portion(fl oz)`),
+            `Saturated fat(g)` = sum(`Saturated fat(g)`)/sum(`Portion(fl oz)`),
+            `Trans fat(g)` = sum(`Trans fat(g)`)/sum(`Portion(fl oz)`),
+            `Cholesterol(mg)` = sum(`Cholesterol(mg)`)/sum(`Portion(fl oz)`),
+            `Sodium(mg)` = sum(`Sodium(mg)`)/sum(`Portion(fl oz)`),
+            `Total Carbohydrate(g)` = sum(`Total Carbohydrate(g)`)/sum(`Portion(fl oz)`),
+            `Dietary Fiber(g)` = sum(`Dietary Fiber(g)`)/sum(`Portion(fl oz)`),
+            `Sugars(g)` = sum(`Sugars(g)`)/sum(`Portion(fl oz)`),
+            `Protein(g)` = sum(`Protein(g)`)/sum(`Portion(fl oz)`),
+            `Caffeine(mg)` = sum(`Caffeine(mg)`)/sum(`Portion(fl oz)`)) %>%
+  ungroup()
+```
+
+### Transform data frame into a matrix
+
+The data has to be a data matrix to create the heatmap, and every row name must be unique.
+The following code chunk below uses unite()  from **dplyr** package to create a new variable as the row name, and data.matrix() from base R to transform the data frame into a data matrix.
+
+```{r}
+#Create new variable from the existing categorical variables 
+kids_grp <- kids_grp %>%
+              unite("Type", c(`Name`,`Milk`,`Whipped Cream`), sep = '-', remove = FALSE)
+```
+
+```{r}
+#Select the relevant variables
+kg <- select(kids_grp,c(5:16))
+
+#Change the rows by the drink type instead of row number
+row.names(kg) <- kids_grp$Type
+
+#Convert data frame to a data matrix
+k_matrix <- data.matrix(kg)
+
+```
+
+# 5.0 Creating the Visualisation
+
+## 5.1 Determine best clustering approach
+
+In order to determine the best clustering method for the heatmap and number of cluster the dend_expend() and find_k() functions of *dendextend* package will be used.
+
+```{r}
+kd <- dist(normalize(k_matrix, method = "euclidean"))
+dend_expend(kd)[[3]]
+
+```
+The output table shows that “average” method should be used because it gave the high optimum value. Next, find_k() is used to determine the optimal number of cluster.
+
+```{r}
+kd_cluster <- hclust(kd, method = "average") 
+num_k <- find_k(kd_cluster)
+plot(num_k)
+```
+Although 10 is the recommended number of clusters, from the graph above, k = 3 is sufficient since the incremental value of the average silhouette compared to k = 10 is very small. 
+
+## 5.2 An Interactive Heatmap using heatmpaply
+
+Using heatmaply() from the **heatmaply** package, the following code chunk is used to create the final visualisation. Some trial and error is performed to determine the optimal figure height and font size. 
+
+The normalising method is chosen as the data contains many variables of different scale and of different distributions.
+
+Since this is an interactive chart, readers can also zoom in and focus on a specific area of interest. 
+
+
+```{r, fig.height = 8}
+#heatmap created with normalised data matrix
+heatmaply(normalize(k_matrix),
+          Colv=NA,
+          seriate = "none",
+          colors = Greens,
+          
+          #no. of clusters is 3
+          k_row = 3,
+          margins = c(NA,150,30,NA),
+          fontsize_row = 5,
+          fontsize_col = 6,
+          main = "Starbucks' Kids & Others Drinks Nutritional Content",
+          xlab = "Nutrition indicators (per fl oz)",
+          ylab = "Type of Drinks",
+          
+          #to have a white grid to help identify different cells
+          grid_gap = 1
+         
+          )
+```
+
+## 5.3 Static Heatmap using pheatmap
+
+While the interactive heatmap created using heatmaply allows readers to zoom in and out to focus on a specific area and reads the value via the tooltip, it does not offer an easy way to visualise observations if there are more than one categorical variable. Hence **pheatmap** package is used to add annotations to differentiate the observations further based on a chosen category.
+
+The following code chunk is used to create a static heatmap using pheatmap(), with "Whipped Cream" as the annotation target. 
+
+```{r}
+#filter relevant variables to create the data matrix
+kg_p <- select(kids_grp,c(3:16))
+
+#Change the rows by the drink type instead of row number
+row.names(kg_p) <- kids_grp$Type
+
+#Convert data frame to a data matrix
+k_matrix_p <- data.matrix(kg_p)
+
+```
+
+```{r, fig.height = 7, fig.width = 10}
+k_matrix_p2 <- k_matrix_p[,3:14]
+
+#create an independent data frame comprising of "Whipped Cream" status
+k_row <- data.frame("Whipped Cream" = kg_p$`Whipped Cream`)
+
+#ensure that the row names of the annotation data frame matches the row names of the heatmap matrix
+rownames(k_row) <- rownames(kg_p)
+
+#using pheatmap to create the heatmap
+pheatmap(normalize(k_matrix_p2),
+         
+  #annotate the rows using the earlier defined data frame
+  annotation_row = k_row,
+  clustering_method = "average",
+  clustering_distance_cols = "euclidean",
+  cluster_cols = FALSE,
+  margins = c(NA,150,30,NA),
+  fontsize_row = 5,
+  fontsize_col = 7,
+  
+  #cut the map into 3 clusters
+  cutree_rows = 3,
+  color = colorRampPalette(c("white", "dark green"))(60),
+  main ="Starbucks Kids & Others Drinks \n (Categorised by Whipped Cream)"
+         )
+```
+Based on the above heatmap created by pheatmap, it is clear that one cluster is formed by drinks with whipped cream, and the nutritional indicators of drinks under this category have high value.
+ 
+# Observations
+
+- Calories from fat and Total Fat(g) have perfect correlation, which is expected since the former is derived from the latter. Hence "Calories from fat" can be removed. 
+- The clusters are clustered based on the level of nutritional content. Drinks with whipped cream and whole milk or 2% milk have higher calories, saturated fats, transfats and cholesterol. Among all the drinks, salted caramel hot chocolate with whole milk has the highest content of the various indicators. Sodium level is high for Salted Caramel type of drinks. Such drinks should be avoided for health reasons.
+- From the heatmap, it is observed that there is an outlier for the caffeine amount of Vanilla Creme with Almond, as it is the only vanilla creme drink with caffeine, and the caffeine amount is the highest amongst all the drinks. Indeed, a check on the raw data reveals that the caffeine level is likely an error since the same drink of other sizes do not have any caffeine at all.
+
+
+![](image/outlier.png)
+
+
+# References
+
+- Prof Kam's [Building Heatmap with R](https://isss608-ay2021-22t2.netlify.app/hands-on_ex/hands-on_ex05/hands-on_ex05-heatmap)
+- [Introduction to heatmaply](https://cran.r-project.org/web/packages/heatmaply/vignettes/heatmaply.html)
+- [Heatmaply documentation](https://cran.r-project.org/web/packages/heatmaply/heatmaply.pdf)
+- [pheatmap documentation](https://www.rdocumentation.org/packages/pheatmap/versions/1.0.12/topics/pheatmap)
+- [Towards Data Science tutorial on pheatmap](https://towardsdatascience.com/pheatmap-draws-pretty-heatmaps-483dab9a3cc)
+
+
+
+

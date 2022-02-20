@@ -1,7 +1,7 @@
 ---
 title: "Take-home Exercise 1"
 description: 
-  Creating data visualisation beyond default
+  Putting Visual Analytics into Practical Use
 author:
   - name: Ang Bi Lian
   - url: https://bilian-mitb2021.netlify.app/
