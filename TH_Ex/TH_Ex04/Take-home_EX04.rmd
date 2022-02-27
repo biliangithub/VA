@@ -1,5 +1,5 @@
 ---
-title: "Take-home Exercise 3"
+title: "Take-home Exercise 4"
 description: 
   Visualising and Analysing Time-series Financial Data - Impact of COVID-19 on the stock prices of top 40 companies in Singapore by market capitalisation
 author:
