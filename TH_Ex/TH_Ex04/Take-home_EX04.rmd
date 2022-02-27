@@ -1,0 +1,239 @@
+---
+title: "Take-home Exercise 3"
+description: 
+  Visualising and Analysing Time-series Financial Data - Impact of COVID-19 on the stock prices of top 40 companies in Singapore by market capitalisation
+author:
+  - name: Ang Bi Lian
+  - url: https://bilian-mitb2021.netlify.app/
+date: "`r Sys.Date()`"
+output: 
+  distill::distill_article:
+    toc: true        
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.retina = 3)
+```
+# 1.0 The Task
+
+For this [take-home exercise](https://isss608-ay2021-22t2.netlify.app/th_ex/th_ex04), I am required to apply appropriate data visualisation techniques to accomplish the following task:
+
+a. Script stock prices of top 40 companies in Singapore by market capitalisation between 1st January 2020 - 31st December 2021 by using tidyquant R package.
+
+b. Using either calender heatmap or horizon graph, prepare a data visualisation showing the historical stock prices by the top 40 companies by market capitalisation.
+
+# 2.0 Proposed Sketch
+
+For this task, a horizon graph similar to the one shown in the [lesson 7 slide](https://isss608-ay2021-22t2.netlify.app/lesson/lesson06/lesson06-it_is_about_time#45) will be used.
+   
+[Calendar heat map](https://isss608-ay2021-22t2.netlify.app/lesson/lesson06/lesson06-it_is_about_time#50)
+
+# 3.0 Installing and loading the required libraries
+
+For this visualization, the following packages are used
+
+- *tidyverse*   : To tidy up and manipulate the data as needed 
+- *rmarkdown*   : To convert the document into a variety of format (html for this task)
+- *tidyquant*   : To  return objects in the tidy ‘tibble’ format that is ideal for time series analysis.
+- *rvest*       : To scrap data from web application (Yahoo Finance for this exercise)
+- *ggHoriPlot*  : To build horizon plots
+- *ggplot2*     : To plot basic time series charts
+- *plotly*      : To include interactive elements in ggplots
+- *knitr*       : To generate table
+- *ggthemes*    : To obtain the necessary colour themes
+
+
+```{r}
+packages = c('tidyverse','rmarkdown', 'rvest', 'tidyquant', 'ggHoriPlot', 'plotly', 'ggplot2', 'knitr', 'ggthemes')
+  for (p in packages){
+    if(!require(p, character.only =T)){
+      install.packages(p)
+    }
+  }
+```
+
+# 4.0 Importing the dataset and Data Wrangling
+
+## 4.1 Top 40 stocks
+
+First, we download the list of top 40 companies in Singapore by market capitalisation from this [website](https://companiesmarketcap.com/singapore/largest-companies-in-singapore-by-market-cap/). 
+
+The following code chunk is used to import the data. We only require the symbol and Name variables, so select() of *dplyr* is used to extract the corresponding stock prices from Yahoo Finance subsequently. slice_head() of the *dplyr* is also used to extract the top 40 observations as the original dataset contain 41 companies.
+
+In addition, as.vector() of *Base R* is required to convert the name and symbols to vector so that they could be recognized as vectors to extract the corresponding stock prices. If we do not convert, we will have an error when using tq_get() to process the data in tibble format.
+
+```{r}
+top40s <- read_csv("data/Top40stocks.csv")
+
+Name_Symbol <- top40s %>%
+          slice_head(n = 40) %>%
+          select(`Name`, `Symbol`)
+
+top40name <- as.vector(Name_Symbol$Name)
+top40symbol <- as.vector(Name_Symbol$Symbol)
+
+glimpse(Name_Symbol)
+
+```
+## 4.2 Download data from Yahoo Finance
+
+Next, stock prices for the period 1st January 2020 - 31st December 2021 are downloaded from [Yahoo Finance](https://finance.yahoo.com) using the *rvest* package, as shown in code chunk below. read_html() is used to query data from Yahoo Finance, and html_node() is used to locate the first nde that matches the selector (stock symbol), while html_text() is used to extract the content as text. 
+
+```{r}
+symbol = 'Name_Symbol$Symbol' 
+#top 40 stocks'symbol as imported earlier (refer to para 4.1)
+
+url = paste0('https://finance.yahoo.com/quote/', symbol, '/financials?p=', symbol)
+
+html_data = read_html(url) %>% html_node('body') %>% html_text()
+
+```
+
+To plot time-series charts, we will need to re-format the dataset into a suitable dataframe/tibble format. To do this, *tidyquant* package is used, specifically the tq_get() to convert the data into tibble format, and tq_transmute() to tidy the data frame.  
+
+```{r}
+from_date = "2020-01-01"
+to_date = "2021-12-31"
+period_type = "days"  # daily prices chosen
+
+stock_data_daily = tq_get(top40symbol,
+               get = "stock.prices",
+               from = from_date,
+               to = to_date) %>% 
+      group_by(symbol) %>%   
+# to group the data by symbol, otherwise the daily prices of all the stocks will be       aggregated 
+     
+   tq_transmute(select= NULL, 
+                  mutate_fun = to.period, 
+                  period  = period_type)
+
+kable(head(stock_data_daily))
+```
+
+## 4.3 Data Wrangling
+
+For the visualisation, the daily adjusted closing price is used. The [adjusted stock price](https://www.investopedia.com/terms/a/adjusted_closing_price.asp) amends a stock's closing price to reflect that stock's value after accounting for any corporate actions. It is often used when examining historical returns or doing a detailed analysis of past performance.
+
+```{r}
+adj_dailystock <- stock_data_daily %>%
+  select(`symbol`, `date`, `adjusted`)
+head(adj_dailystock)
+```
+
+Next, we add in the name of the stock so that it is easier for reader to recognize the stock, by using the merge() function of *Base R*.
+
+```{r}
+adj_dailystock_name <- merge(adj_dailystock, Name_Symbol, by.x = "symbol", by.y = "Symbol")
+
+head(adj_dailystock_name)
+```
+# 5.0 Creating the Horizon Plot
+
+A horizon plot is a special type of area plot in which the original data is transformed based on an origin and a horizon scale. The data is cut in different intervals, and the further the data is from the origin, the deeper its color usually is. All the intervals above the origin are then stacked on top of one another, keeping the intervals closest to the origin in the bottom and the furthest away ones on top. Such a plot is most useful when plotting and comparing different moving values, which is applicable to our example since stock prices are generally volatile. To create the horizon plot, the following code chunk using *ggHoriPlot* package is applied.
+
+```{r, fig.width = 10, fig.height = 8}
+hplot <- adj_dailystock_name %>% 
+  ggplot() +
+  geom_horizon(aes(date,adjusted), origin = "midpoint") +
+  #origin of horizon plot set as midpoint between the data range (default option)
+  
+  scale_fill_hcl(palette = 'RdBu', reverse = F) +
+  facet_grid(Name~.) +
+  geom_vline(xintercept = as.Date("2020-03-11"), colour = "grey15", linetype = "dashed", size = 1)+
+  #adding a reference line to indicate the start of the Covid-19 pandemic as declared by WHO
+  
+  geom_vline(xintercept = as.Date("2020-12-14"), colour = "grey15", linetype = "dashed", size = 1)+
+   #adding a reference line to indicate when Singapore approved the first covid-19 vaccine
+  
+  theme_few() +
+  theme(
+    panel.spacing.y=unit(0, "lines"),
+    strip.text.y = element_text(size = 7, angle = 0, hjust = 0),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.border = element_blank(), 
+    legend.position = 'none'
+    ) +
+  scale_x_date(expand=c(0,0), 
+               date_breaks = "1 month", 
+               date_labels = "%b") +
+  ggtitle('Daily Prices (Adjusted) of Top 40 Singapore Stocks by Market Capitalisation', 
+          'Jan 2020 to Dec 2021 (Source: Yahoo Finance)') +
+  xlab(" ")
+  
+hplot
+```
+
+
+For the horizon chart, midpoint is chosen as the origin. The default number of cuts is used, which is 6 i.e. 3 parts above the origin and 3 parts below the orign. Based on the colour palette chosen, the parts coloured in 3 shades of red indicate a drop in the price, the darker implying the largest drop, where the parts in blue indicate a rise in the prices. 
+
+The  vertical dash line on the left side of the chart is added to  indicate the date where the WHO declared the Covid-19 outbreak as a global pandemic. The vertical dashline in the middle of the chart is to indicate the date when Singapore first approved a Covid-19 vaccine for use.
+
+# 6.0 Observations
+
+Key observations are:
+
+* Following the declaration of the Covid-19 outbreak as a pandemic on 11 March 2020, it is observed that most of the stocks prices deep dived. the global stock market was sent into a turmoil. 
+
+* The stock prices of most stocks generally rebounded around December 2020 onwards, which coincides with the period whereby the first Covid vaccinces were approved by countries (e.g. UK approved the use of Pfizer-BioNTeck vaccine on 2 December 2020, Singapore gave approval on 14 December 2020, WHO listed the same vaccine for emergency use on 31 Dec 2020.)
+
+* The prices of the following stocks differ from the general trend:
+    + Strong stocks that rebounded quickly (well before vaccine was approved) and performed well: Ascendas Reit, Frasers Logistics & amp, Keppel Reit, Mapletree Industrial Trust, Mapletree Logistics Trust, Netlink Trust.
+    
+    + Weak stocks that did not do well even after vaccine was approved: City Developments, ComfortDelgro, Singapore Airlines, Singtel, Triterras.
+    
+A key limitation of horizon plot using  *ggHoriPlot* package is that users are unable to interact with the chart, and zoom into the elements of interest. As I'm interested in understanding the trend of some of these stocks, interactive time-series charts using *plotly* are plotted instead for the strong and weak stocks identified from the horizon plot. 
+
+```{r}
+strongstocks <- adj_dailystock_name %>%
+        filter (`symbol` == c("BUOU.SI", "K71U.SI", "A17U.SI", "M44U.SI", "ME8U.SI", "CJLU.SI"))
+strong <- data.frame(strongstocks)
+```
+
+```{r, fig.width = 12, fig.height = 8}
+ts <- ggplot(strong, aes(x = date, y = adjusted))+
+        scale_y_continuous() +
+        geom_line() +
+        facet_wrap(~Name, scales = "free_y",  nrow = 3, ncol = 2) +
+        #scales = free_y as not all the stocks have the same price range
+        theme_tq() +
+        labs(title = "Daily stock prices of selected strong stocks", x = "", y = "Adjusted Price") +
+        theme(axis.text.x = element_text(size = 6), axis.text.y = element_text(size = 6))
+
+ggplotly(ts)
+```
+```{r}
+weakstocks <- adj_dailystock_name %>%
+        filter (`symbol` == c("C09.SI", "SINGF", "SNGNF", "TRIT"))
+weak <- data.frame(weakstocks)
+```
+
+```{r, fig.width = 12, fig.height = 6}
+tw <- ggplot(weak, aes(x = date, y = adjusted))+
+        scale_y_continuous() +
+        geom_line() +
+        facet_wrap(~Name, scales = "free_y",) +
+        theme_tq() +
+        labs(title = "Daily stock prices of selected weak stocks", x = "", y = "Adjusted Price") +
+        theme(axis.text.x = element_text(size = 6), axis.text.y = element_text(size = 6))
+
+ggplotly(tw)
+```    
+
+As shown from the above charts, it is clear that the weak stocks performed badly have not recover to the pre-Covid prices. A prudent investor might wish to consider the selected strong stocks as shown.
+
+# References
+
+- https://giniceseah.netlify.app/posts/2021-06-18-scraping-of-financial-dataset/#tidyquant-package
+- https://dplyr.tidyverse.org/reference/slice.html
+- https://www.rdocumentation.org/packages/tidyquant/versions/1.0.3/topics/tq_get
+- https://www.investopedia.com/terms/a/adjusted_closing_price.asp
+- https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/merge
+- https://rivasiker.github.io/ggHoriPlot/reference/geom_horizon.html
+- https://www.channelnewsasia.com/business/singapore-shares-sgx-stocks-10-year-low-covid-19-coronavirus-771846
+- https://plotly.com/ggplot2/time-series/
